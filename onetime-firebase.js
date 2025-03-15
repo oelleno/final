@@ -39,7 +39,9 @@ async function getFirebaseConfig() {
     } catch (error) {
         console.warn("클라우드 함수에서 Firebase 설정 가져오기 실패, 폴백 설정 사용:", error);
 
-        throw new Error("Firebase 설정을 가져오는데 실패했습니다.");
+        // 폴백 Firebase 설정 (직접 설정)
+        return {
+            apiKey: "AIzaSyAyP5QTMzBtz8lMEzkE4C66CjFbZ3a17QM",
             authDomain: "bodystar-1b77d.firebaseapp.com",
             projectId: "bodystar-1b77d",
             storageBucket: "bodystar-1b77d.appspot.com",
