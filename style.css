@@ -130,6 +130,19 @@ body, .container {
   .thisbox[readonly] {
     background-color: #f5f5f5;
   }
+  
+  /* 드롭다운 메뉴 너비 조정 */
+  select.thisbox option {
+    width: 100%;
+  }
+  
+  /* 선택 드롭다운 메뉴 스타일 */
+  select.thisbox option,
+  .dropdown-menu {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+  }
 
   /* Personal info input fields */
   input[name="userid"],
@@ -397,3 +410,47 @@ body, .container {
     opacity: 0.6;
     cursor: not-allowed;
   }
+
+/* 드롭다운 메뉴 설정 - 부모 요소와 같은 너비 */
+.dropdown-menu {
+  width: 100% !important;
+  min-width: 100% !important;
+  box-sizing: border-box;
+  border-radius: 8px;
+  margin-top: 2px;
+}
+
+.dropdown-item {
+  width: 100%;
+  box-sizing: border-box;
+  white-space: normal;
+  padding: 8px 10px;
+}
+
+/* select 요소가 드롭다운될 때의 너비 설정 */
+select {
+  width: 100%;
+}
+
+select option {
+  width: 100%;
+  box-sizing: border-box;
+  max-width: inherit !important;
+  padding: 10px !important; /* 옵션 항목 패딩 추가 */
+  height: auto !important; /* 높이 자동 조정 */
+  min-height: 30px !important; /* 최소 높이 설정 */
+}
+
+/* 드롭다운 메뉴 너비 제한 추가 */
+select.thisbox option,
+#branch option, 
+#contract_manager option {
+  width: 100% !important;
+  min-width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 15px 20px !important; /* 패딩 추가로 크기 확대 */
+  font-size: 18px !important; /* 글꼴 크기 더 키우기 */
+  line-height: 1.6 !important; /* 줄 간격 조정 */
+  height: auto !important;
+  min-height: 50px !important; /* 최소 높이 더 증가 */
+}

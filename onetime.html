@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=2, user-scalable=yes">
+
+  </head>
+
+
+  </script>
+  <title>1회 이용권</title>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Material Icons -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
+  <!-- Firebase는 onetime-firebase.js에서 모듈로 로드됩니다 -->
+  <script src="./onetime-script.js"></script>
+  <script src="./sign.js"></script>
+  <script type="module" src="./onetime-excel.js"></script>
+  <script type="module" src="./onetime-firebase.js"></script>
+  <script type="module" src="./onetime-settings.js"></script>
+  <script src="./popup-manager.js"></script>
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./mobile.css">
+  <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+  <script src="https://cdn.ckeditor.com/ckeditor5/34.0.0/classic/ckeditor.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <script src="./pencheck.js"></script> <!-- ✏️ 형광펜 -->
+  <script>
+    // Add event listener when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        const discountBtn = document.getElementById('discount-btn');
+        if (discountBtn) {
+            discountBtn.addEventListener('click', showDiscountPopup);
+        }
+    });
+
+    function formatCurrency(input) {
+      // 입력 값에서 숫자만 추출
+      let value = input.value.replace(/[^\d]/g, "");
+
+      // 숫자를 3자리 단위로 쉼표 추가
+      value = new Intl.NumberFormat("ko-KR", {
+        style: "currency",
+        currency: "KRW",
+      }).format(value);
+
+      // ₩ 표시 제거 (placeholder가 이미 ₩를 보여주기 때문에 중복 방지)
+      value = value.replace("₩", "").trim();
+
+      // 변환된 값을 다시 input에 설정
+      input.value = value;
+    }
+
+    // 할인 팝업 표시 함수
+    function showDiscountPopup() {
+      const popup = document.createElement('div');
+      popup.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 20px rgba(0,0,0,0.3);
+        z-index: 1000;
+        min-width: 300px;
+        font-size: 16px;
+      `;
+
+      const overlay = document.createElement('div');
+      overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 999;
+      `;
+
+      const discountContainer = document.createElement('div');
+      discountContainer.id = 'discount-items';
+      discountContainer.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      `;
+
+      // 팔로우 할인 행 추가
+      const followRow = document.createElement('div');
+      followRow.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      `;
+
+      const followLabel = document.createElement('div');
+      followLabel.textContent = '팔로우 할인';
+      followLabel.style.cssText = `
+        width: 120px;
+        font-weight: bold;
+      `;
+
+      const followInput = document.createElement('input');
+      followInput.type = 'text';
+      followInput.style.cssText = 'width: 150px; padding: 5px; border-radius: 5px; font-size: 14px;';
+      followInput.placeholder = '(₩)금액입력';
+      followInput.setAttribute('inputmode', 'numeric');
+      followInput.oninput = function() { formatCurrency(this); };
+
+      followRow.appendChild(followLabel);
+      followRow.appendChild(followInput);
+      discountContainer.appendChild(followRow);
+
+      // 리뷰 할인 행 추가
+      const reviewRow = document.createElement('div');
+      reviewRow.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      `;
+
+      const reviewLabel = document.createElement('div');
+      reviewLabel.textContent = '리뷰 할인';
+      reviewLabel.style.cssText = `
+        width: 120px;
+        font-weight: bold;
+      `;
+
+      const reviewInput = document.createElement('input');
+      reviewInput.type = 'text';
+      reviewInput.style.cssText = 'width: 150px; padding: 5px; border-radius: 5px; font-size: 14px;';
+      reviewInput.placeholder = '(₩)금액입력';
+      reviewInput.setAttribute('inputmode', 'numeric');
+      reviewInput.oninput = function() { formatCurrency(this); };
+
+      reviewRow.appendChild(reviewLabel);
+      reviewRow.appendChild(reviewInput);
+      discountContainer.appendChild(reviewRow);
+
+      // 할인 요약 표시 영역 추가
+      const summaryDiv = document.createElement('div');
+      summaryDiv.id = 'discount-summary';
+      summaryDiv.style.cssText = `
+        margin-top: 15px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 5px;
+        border: 1px solid #dee2e6;
+        font-size: 14px;
+      `;
+      summaryDiv.innerHTML = '<div>할인 금액 합계: ₩ 0</div>';
+
+      function updateDiscountSummary() {
+        const followAmount = parseInt(followInput.value.replace(/[^\d]/g, '')) || 0;
+        const reviewAmount = parseInt(reviewInput.value.replace(/[^\d]/g, '')) || 0;
+        const total = followAmount + reviewAmount;
+
+        // 할인 상세 내역 없이 합계만 표시
+        let summaryHTML = '';
+        if (total > 0) {
+          summaryHTML = `<div><strong>할인 합계: ₩ ${total.toLocaleString('ko-KR')}</strong></div>`;
+        } else {
+          summaryHTML = '<div>할인 금액 합계: ₩ 0</div>';
+        }
+
+        summaryDiv.innerHTML = summaryHTML;
+        return total;
+      }
+
+      // 입력 이벤트 추가
+      followInput.addEventListener('input', updateDiscountSummary);
+      reviewInput.addEventListener('input', updateDiscountSummary);
+
+      const confirmButton = document.createElement('button');
+      confirmButton.textContent = '확인';
+      confirmButton.style.cssText = `
+        margin-top: 15px;
+        padding: 8px 20px;
+        background: #0078D7;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        float: right;
+        font-size: 16px;
+      `;
+
+      confirmButton.onclick = function() {
+        const total = updateDiscountSummary();
+        document.getElementById('discount').value = '₩ ' + total.toLocaleString('ko-KR');
+        calculateTotal();
+        document.body.removeChild(overlay);
+        document.body.removeChild(popup);
+      };
+
+      popup.appendChild(discountContainer);
+      popup.appendChild(summaryDiv);
+      popup.appendChild(confirmButton);
+      document.body.appendChild(overlay);
+      document.body.appendChild(popup);
+    }
+  </script>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header-container">
+      <div style="display: flex; align-items: center;" class="headerLogoSection">
+        <img src="./BDSR.png" alt="Logo" style="height: 60px; margin-right: 0px; cursor: pointer;" class="brandLogo" onclick="window.location.href='index.html'">
+      </div>
+      <h2 style="text-align: center; flex: 1; font-size: 1.8em; margin-bottom: 15px;">1회 이용권 신청서<br><span
+          style="font-size: 16px; font-weight: bold; display: block; width: 100%;">One Time Pass</span></h2>
+    </div>
+
+    <div style="display: flex; width: 98%; justify-content: space-between; margin: 5px 0 10px 10px;">
+      <div style="display: flex; align-items: center; gap: 5px;">
+        <i class="fa-brands fa-gg-circle icon" style="color: #000000;padding-left: 0px; margin-bottom: -5px;"></i>
+        <select name="branch" id="branch" class="thisbox" style="width: 110px; height: 30px; margin-left: -5px;">
+          <option value="">지점 선택</option>
+          <!-- 지점 목록은 JavaScript로 동적 로드됩니다 -->
+        </select>
+      </div>
+      <div style="display: flex; align-items: center; gap: 0px;">
+        <p style="padding-left: 0px; margin-bottom: -5px;"><i class="fa-solid fa-circle-info icon"></i>계약담당</p>
+        <select name="contract_manager" id="contract_manager" class="thisbox" style="width: 110px; height: 30px; margin-top: 5px; margin-left: 5px;">
+          <option value="">담당자 선택</option>
+          <!-- 담당자 목록은 JavaScript로 동적 로드됩니다 -->
+        </select>
+      </div>
+    </div>
+    <hr>
+    <form id="regform">
+
+      <input type="hidden" name="isssn" id="isssn" value="n">
+
+      <div class="section name-contact" style="margin-bottom: -5px; display: flex; gap: 5px;">
+        <div style="width: 50%;">
+          <p style="margin-bottom: 5px;"><i class="fa-solid fa-circle-user icon"></i>이름</p>
+          <input type="text" name="name" id="name" maxlength="20" class="thisbox" lang="ko" inputmode="text">
+        </div>
+        <div style="width: 50%;">
+          <p style="margin-bottom: 5px;"><i class="fa-solid fa-futbol icon"></i>성별</p>
+          <div class="radio-group" style="width: calc(100% - 15px); margin-left: 15px;">
+            <label style="font-size: 14px;"><input type="radio" name="gender" value="남자"> 남자</label>
+            <label style="font-size: 14px;"><input type="radio" name="gender" value="여자"> 여자</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="section" style="margin-top: 5px;">
+        <div>
+          <p style="margin-bottom: 5px;"><i class="fa-solid fa-bowling-ball icon"></i>연락처</p>
+          <input type="text" name="contact" id="contact" maxlength="20" class="thisbox" placeholder="000-0000-0000"
+            oninput="formatPhoneNumber(this)" lang="ko" inputmode="numeric">
+          <script>
+            // Auto-fill verified phone number
+            window.onload = function () {
+              const verifiedPhone = localStorage.getItem('verifiedPhone');
+              if (verifiedPhone) {
+                document.getElementById('contact').value = verifiedPhone;
+                document.getElementById('contact').readOnly = true;
+                document.getElementById('contact').style.backgroundColor = '#f5f5f5';
+              }
+            };
+          </script>
+        </div>
+      </div>
+
+      <div class="section" style="display: flex; gap: 5px; margin-bottom: 5px;">
+        <div style="flex: 1;">
+          <p style="margin-bottom: 5px;"><i class="fa-solid fa-circle-check icon"></i>금액</p>
+          <input type="text" name="price" id="price" class="thisbox" value="₩ 22,000" style="background-color: #f5f5f5;" readonly>
+        </div>
+        <div style="flex: 1;">
+          <p style="margin-bottom: 5px;"><i class="fa-solid fa-circle-down icon"></i>할인</p>
+          <div style="display: flex; flex-direction: row; border: 1px solid #ccc; border-radius: 10px; padding: 5px; background-color: #ffebeb; align-items: center; height: 35px; justify-content: space-around; margin-left: 15px;">
+            <!-- 할인 항목은 동적으로 로드됩니다 -->
+            <label style="font-size: 13px; display: flex; align-items: center; gap: 3px;">
+              <input type="checkbox" id="follow_discount" onchange="updateDiscounts()">
+              <span>로딩 중...</span>
+            </label>
+          </div>
+          <input type="hidden" name="discount" id="discount" value="₩ 0">
+        </div>
+      </div>
+
+      <div class="section" style="display: flex; gap: 5px; margin-bottom: 5px;">
+        <div style="flex: 1; width: 70%;">
+          <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px; margin-bottom: 5px;">
+            <p style="margin: 0;"><i class="fa-solid fa-gauge icon"></i>합계</p>
+            <div style="display: flex; gap: 0px; font-size: 12px; align-items: center;">
+              <label><input type="radio" name="payment" value="카드"> 카드</label>
+              <label><input type="radio" name="payment" value="현금"> 현금</label>
+              <label><input type="radio" name="payment" value="계좌이체"> 계좌이체</label>
+            </div>
+          </div>
+          <div class="total-amount-container">
+            <input type="text" name="total_amount" id="total_amount" class="thisbox" placeholder="총 금액" readonly lang="ko" inputmode="numeric">
+          </div>
+        </div>
+
+        <div style="flex: 1; width: 30%;">
+          <div style="display: flex; align-items: center; gap: 5px; margin-top: 5px; margin-bottom: 5px;">
+            <p style="margin: 0;"><i class="fa-solid fa-receipt icon"></i>현금영수증</p>
+            <div style="display: flex; gap: 5px; font-size: 12px; align-items: center;">
+              <label><input type="radio" name="cash_receipt" value="O"> 발급</label>
+              <label><input type="radio" name="cash_receipt" value="X"> 미발급</label>
+            </div>
+          </div>
+          <div class="receipt-container">
+            <input type="text" name="receipt_phone" id="receipt_phone" class="thisbox" 
+              style="height: 35px; width: 96%; font-size: 12px;" placeholder="현금영수증 번호"
+              oninput="formatPhoneNumber(this)" lang="ko" inputmode="numeric">
+          </div>
+        </div>
+      </div>
+
+      <div class="section" style="margin-bottom: 5px;">
+        <p style="margin-bottom: 5px;"><i class="fa-solid fa-compass icon"></i>가입경로</p>
+        <div style="padding: 3px 5px; margin: 0 0px 5px 15px; border: 1px solid #ccc; border-radius: 10px; height: 35px; display: flex; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 5px; flex-wrap: wrap;" class="referral">
+            <!-- 가입경로 항목은 동적으로 로드됩니다 -->
+            <label style="font-size: 13px; white-space: nowrap;"><input type="checkbox" name="referral" value="로딩중"> 로딩중...</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 약관 내용 추가 -->
+      <div class="section terms-section" style="margin-left: 10px; margin-top: 30px;">
+        <div style="border: 2px solid #003366; border-radius: 10px; padding: 15px 10px; margin-bottom: 15px;">
+          <p class="terms" style="text-align: center; font-weight: bold; font-size: 22px; margin-bottom: 16px; border-bottom: 1px solid #003366; padding-bottom: 10px;">이용 주의사항</p>
+          <p class="terms" style="font-size: 22px; line-height: 1.4; font-weight: 500;">
+            1회 이용 금액은 <span id="notice-price">22,000원</span>입니다.<br>
+            시설이용 중 안전사고 및 불미스러운 사고 예방을 위해 반드시<br>실명과 현재 연락가능한 연락처를 기입하여야 합니다.<br>
+            1회 이용에 GX 등 수업은 포함되지 않습니다.<br>
+            최대 이용시간은 4시간입니다.<br>
+            타인에게 피해를 주는 행동을 하시면 환불 없이 퇴실조치 됩니다.<br>
+            바디스타 휘트니스의 프로모션 정보가 문자로 전송될 수 있습니다.
+          </p>
+          <div style="text-align: right; margin-top: 10px; border-top: 1px solid #003366; padding-top: 10px;">
+            <label style="font-size: 18px;">
+              <input type="checkbox" name="terms_agree" lang="ko" inputmode="checkbox"> <strong>위 주의사항에 동의합니다</strong>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="section signbox">
+        <p style="font-weight: bold; font-size: 22px; margin-top: 4px; margin-left: 15px;">상기 주의사항을 확인하였으며, 시설 단기 이용을 신청합니다.</p>
+
+        <div class="sign-date">
+          <p style="font-size: 18px; font-weight: bold;"><select class="year" id="yearInput"
+              style="font-size: 18px; font-weight: bold;"></select> 년
+            <select class="month" id="monthInput" style="font-size: 18px; font-weight: bold;"></select> 월
+            <select class="day" id="dayInput" style="font-size: 18px; font-weight: bold;"></select> 일
+          </p>
+        </div>
+        <div>
+          <p style="margin: -30px 140px 5px 0px; font-size: 12px; text-align: right;">신청인
+          <p style="margin: -25px 10px 0px 0px; text-align: right;"><span class="dictation-text" data-text="(서명)"
+              style="padding: 30px 90px; display: inline-block; position: relative;"><span
+                style="position: absolute; bottom: 30px; right: 5px;">(서명)</span></span></p>
+        </div>
+
+        <div class="button-container" style="margin: 0 auto; text-align: center;">
+          <button type="button" onclick="handleOnetimeSubmit()" class="submitBtn">신청완료</button>
+          <div id="status" style="color: #4CAF50; margin-top: 10px; font-weight: bold;"></div>
+        </div>
+      </div>
+  </div>
+  </div>
+  <style>
+    .container {
+  width: 800px;
+  max-width: 100%;
+  min-width: unset;
+  background-color: white;
+  border-radius: 20px;
+  margin: 30px auto;
+  padding: 40px 30px;
+  box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
+  min-height: calc(60vh);
+  display: flex;
+  flex-direction: column;
+}
+    .header-container {
+  width: 100%;
+  padding: 10px 0;
+}
+    .sign-date {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 10px 0;
+}
+    .dictation-text {
+      cursor: pointer;
+      position: relative;
+      display: inline-block;
+      color: #999999;
+      border: 1px solid #cccccc;
+      padding: 0px 4px;
+      border-radius: 3px;
+    }
+
+    .dictation-text img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  </style>
+  <script>
+    // Initialize dictation text handlers
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('.dictation-text').forEach(element => {
+        element.addEventListener('click', function () {
+          const text = this.dataset.text;
+          initDictationCanvas(text, (imageData) => {
+            const img = document.createElement('img');
+            img.src = imageData;
+            this.appendChild(img);
+          });
+        });
+      });
+    });
+
+    // Initialize date selectors
+    (function initializeDateSelectors() {
+      var today = new Date();
+      const yearSelect = document.getElementById('yearInput');
+      const monthSelect = document.getElementById('monthInput');
+      const daySelect = document.getElementById('dayInput');
+
+      // Populate year select (current year to 2025)
+      const currentYear = today.getFullYear();
+      for (let year = currentYear; year <= 2025; year++) {
+        const option = document.createElement('option');
+        option.value = year.toString();
+        option.text = year.toString();
+        yearSelect.appendChild(option);
+      }
+
+      // Populate month select (1-12)
+      for (let i = 1; i <= 12; i++) {
+        const option = document.createElement('option');
+        option.value = i.toString().padStart(2, '0');
+        option.text = i.toString().padStart(2, '0');
+        monthSelect.appendChild(option);
+      }
+
+      // Populate day select (1-31)
+      for (let i = 1; i <= 31; i++) {
+        const option = document.createElement('option');
+        option.value = i.toString().padStart(2, '0');
+        option.text = i.toString().padStart(2, '0');
+        daySelect.appendChild(option);
+      }
+
+      // Set default values to today
+      yearSelect.value = today.getFullYear().toString();
+      monthSelect.value = (today.getMonth() + 1).toString().padStart(2, '0');
+      daySelect.value = today.getDate().toString().padStart(2, '0');
+    })();
+
+    // Calculate total amount
+    function calculateTotal() {
+      const price = parseInt(document.getElementById('price').value.replace(/[^\d]/g, '') || window.basePrice || 22000);
+      const discount = parseInt(document.getElementById('discount').value.replace(/[^\d]/g, '') || 0);
+      const total = price - discount;
+      document.getElementById('total_amount').value = '₩ ' + total.toLocaleString('ko-KR');
+    }
+
+    // Initialize event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+      const discountInput = document.getElementById('discount');
+      discountInput.addEventListener('input', calculateTotal);
+
+      // 초기 계산은 설정 로드 후 수행됩니다
+    });
+
+    // 전역 함수로 내보내기
+    window.calculateTotal = calculateTotal;
+  </script>
+  <script type="module" src="./onetime-kakao.js"></script>
+  </form>
+  </div>
+  </body>
+</html>

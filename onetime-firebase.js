@@ -10,23 +10,12 @@ window.generateReceiptFileName = function(docId, receiptIndex, noteText) {
 
   // 문서 ID에서 정보 추출
   const docIdParts = docId.split('_');
-  const branchCode = isOneTime ? docIdParts[0].replace('one', '') : docIdParts[0]; // YM250313one에서 YM250313 추출
+  const branchCodePart = isOneTime ? docIdParts[0].replace('one', '') : docIdParts[0]; // YM250313one에서 YM250313 추출
   const serialNum = docIdParts[1] || '001'; // 001
   const nameValue = docIdParts[2] || '';  // 이름
 
-  // 브랜치 코드 추출  
-  if (window.branchCodes && typeof window.branchCodes === 'object') {
-    // branch_code가 존재하는 경우 이를 사용
-    for (const branch in window.branchCodes) {
-      if (window.branchCodes[branch] === branchCode) {
-        console.log(`브랜치 코드 ${branchCode}에 해당하는 지점: ${branch}`);
-        break;
-      }
-    }
-  }
-
-  // 새 형식: branch_code250313_001_소피아_R1_영수증노트에적은내용.jpg
-  return `${branchCode}_${serialNum}_${nameValue}_R${receiptIndex}_${noteText}.jpg`;
+  // 새 형식: YM250313_001_소피아_R1_영수증노트에적은내용.jpg
+  return `${branchCodePart}_${serialNum}_${nameValue}_R${receiptIndex}_${noteText}.jpg`;
 };
 
 /* Firebase 설정 가져오기 - 클라우드 함수에서 Firebase 구성 정보를 가져오는 함수 */
@@ -45,19 +34,12 @@ async function getFirebaseConfig() {
         }
 
         const config = await response.json();
-
-        // 한 번만 로그 출력
-        if (!window._configLogged) {
-            console.log("Firebase 설정 가져오기 성공");
-            window._configLogged = true;
-        }
+        console.log("Firebase 설정 가져오기 성공");
         return config;
     } catch (error) {
         console.warn("클라우드 함수에서 Firebase 설정 가져오기 실패, 폴백 설정 사용:", error);
 
-        // 폴백 Firebase 설정 (웹뷰 로그에서 확인된 설정 사용)
-        return {
-            apiKey: "AIzaSyAyP5QTMzBtz8lMEzkE4C66CjFbZ3a17QM",
+        throw new Error("Firebase 설정을 가져오는데 실패했습니다.");
             authDomain: "bodystar-1b77d.firebaseapp.com",
             projectId: "bodystar-1b77d",
             storageBucket: "bodystar-1b77d.appspot.com",
@@ -74,19 +56,14 @@ async function initializeFirebase() {
     if (!firebaseInstance) {
         try {
             const firebaseConfig = await getFirebaseConfig();
-            // 앱 인스턴스 이름 지정하여 중복 초기화 방지
-            const app = initializeApp(firebaseConfig, "main-app-instance");
+            const app = initializeApp(firebaseConfig);
             firebaseInstance = {
                 auth: getAuth(app),
                 db: getFirestore(app),
                 storage: getStorage(app)
             };
-            // 한 번만 로그 출력을 위한 플래그
-            if (!window._mainFirebaseInitialized) {
-                console.log("✅ Firestore 초기화 완료:", firebaseInstance.db);
-                console.log("✅ Firebase Auth 초기화 완료:", firebaseInstance.auth);
-                window._mainFirebaseInitialized = true;
-            }
+            console.log("✅ Firestore 초기화 완료:", firebaseInstance.db);
+            console.log("✅ Firebase Auth 초기화 완료:", firebaseInstance.auth);
         } catch (error) {
             console.error("Firebase 초기화 중 오류 발생:", error);
             throw error;
@@ -139,10 +116,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 // 지점 변경 이벤트 리스너 등록
                 branchSelect.addEventListener('change', updateManagerList);
             }
-
-            // 브랜치 코드 저장 (전역 변수)
-            window.branchCodes = settingsData.branchCodes || {};
-
         } else {
             console.warn("설정 데이터를 찾을 수 없습니다.");
         }
@@ -183,8 +156,8 @@ function updateManagerList() {
     }
 }
 
-/* 회원가입 양식 제출 함수 - 사용자 입력을 수집하여 Firestore에 저장 */
-async function submitForm() {
+/* 일일권 양식 제출 함수 - 사용자 입력을 수집하여 Firestore에 저장 */
+async function submitOnetimeForm() {
     return new Promise(async (resolve, reject) => {
         try {
             const firebaseInstance = await initializeFirebase();
@@ -194,22 +167,14 @@ async function submitForm() {
             const formData = new FormData();
             const name = document.getElementById('name').value.trim();
             const contact = document.getElementById('contact').value.trim();
-            const birthdate = document.getElementById('birthdate').value.trim();
-            const address = document.getElementById('main_address').value.trim();
-            const membership = document.getElementById('membership').value.trim();
+            const price = document.getElementById('price').value.trim();
+            const totalAmount = document.getElementById('total_amount').value.trim();
             const isAdmin = localStorage.getItem("adminVerified");
 
             if (!name || !contact) {
                 reject(new Error("이름과 연락처를 입력하세요."));
                 return;
             }
-
-            /* 추가 결제 및 회원권 정보 수집 */
-            const rentalMonths = document.getElementById('rental_months').value.trim();
-            const lockerMonths = document.getElementById('locker_months').value.trim();
-            const membershipMonths = document.getElementById('membership_months').value.trim();
-            const discount = document.getElementById('discount').value.trim();
-            const totalAmount = document.getElementById('total_amount').value.trim();
 
             /* 문서 ID 생성을 위한 현재 날짜 및 일련번호 설정 */
             const now = new Date();
@@ -221,12 +186,12 @@ async function submitForm() {
             const endOfDay = new Date(now.setHours(23, 59, 59, 999));
 
             /* 지점 정보 가져오기 */
-            const branchValue = document.getElementById('branch')?.value || '';
+            const selectedBranch = document.getElementById('branch').value;
             const year = new Date().getFullYear().toString();
 
             /* 오늘 생성된 문서 수를 계산하여 일련번호 생성 - 지점과 날짜별로 001부터 시작 */
-            const membershipCollection = collection(dbInstance, branchValue, year, "Membership");
-            const querySnapshot = await getDocs(membershipCollection);
+            const onetimeCollection = collection(dbInstance, selectedBranch, year, "Onetimepass");
+            const querySnapshot = await getDocs(onetimeCollection);
             let todayDocs = 0;
 
             querySnapshot.forEach(doc => {
@@ -246,118 +211,63 @@ async function submitForm() {
 
             localStorage.setItem('current_doc_number', dailyNumber);
 
-            /* 브랜치 코드 가져오기 */
-            let branchCode = "";
-            if (window.branchCodes && branchValue) {
-                branchCode = window.branchCodes[branchValue] || "";
-            } 
+            // Get branch code from settings ('YM' for 용문가장점, 'GJ' for 관저점)
+            const branchPrefix = selectedBranch === '용문가장점' ? 'YM' : selectedBranch === '관저점' ? 'GJ' : '';
 
-            // 브랜치 코드가 없으면 기본값으로 폴백
-            if (!branchCode) {
-                branchCode = branchValue === '용문가장점' ? 'YM' : branchValue === '관저점' ? 'GJ' : '';
-            }
-            console.log(`브랜치 코드 ${branchValue}: ${branchCode}`);
+            // Set the correct document ID for onetime pass with branch prefix
+            window.docIdone = `${branchPrefix}${dateStr}one_${dailyNumber}_${name}`;
+            console.log("🚀 생성된 Doc ID:", window.docIdone);
 
-            /* 고유 문서 ID 생성: 브랜치코드+날짜_일련번호_이름 형식 */
-            window.docId = `${branchCode}${dateStr}_${dailyNumber}_${name}`;
-            // 브라우저 콘솔 및 localStorage에 저장 (영수증 페이지 이동을 위함)
-            console.log("🚀 생성된 Doc ID:", window.docId);
-            localStorage.setItem('current_doc_id', window.docId);
-
-            /* 회원 정보 데이터 구성 */
+            // Create the user data for Firestore
             const userData = {
-                docId: window.docId,
+                docId: window.docIdone,
                 name: name,
                 contact: contact,
-                birthdate: birthdate,
-                address: address,
-                membership: membership,
-                branch: document.getElementById('branch')?.value || '',
-                contract_manager: document.querySelector('input[name="contract_manager"]')?.value || document.getElementById('contract_manager')?.value || '',
-                gender: document.querySelector('input[name="gender"]:checked')?.value || '',
-                rental_months: rentalMonths,
-                rental_price: document.getElementById('rental_price').value,
-                locker_months: lockerMonths,
-                locker_price: document.getElementById('locker_price').value,
-                membership_months: membershipMonths,
-                membership_fee: document.getElementById('membership_fee').value,
-                admission_fee: document.getElementById('admission_fee').value,
-                discount: discount,
+                branch: selectedBranch, 
+                contract_manager: document.getElementById('contract_manager').value || '',
+                price: price,
                 totalAmount: totalAmount,
-                goals: Array.from(document.querySelectorAll('input[name="goal"]:checked')).map(cb => cb.value),
-                other_goal: document.getElementById('other').value,
-                workout_times: {
-                    start: document.querySelector('select[name="morning_hour"]').value,
-                    end: document.querySelector('select[name="afternoon_hour"]').value,
-                    additional: document.querySelector('.time-input[type="text"]').value
-                },
+                discountType: Array.from(document.querySelectorAll('input[id^="discount_"]:checked')).map(cb => cb.dataset.type).join(', ') || '',
+                discount: document.getElementById('discount').value || '',
+                gender: document.querySelector('input[name="gender"]:checked')?.value || '',
                 payment_method: document.querySelector('input[name="payment"]:checked')?.value || '',
-                payment_details: Array.from(document.querySelectorAll('#payment-items input')).reduce((acc, input, i) => {
-                    if (i % 2 === 0) {
-                        acc.push({
-                            description: input.value,
-                            amount: document.querySelectorAll('#payment-items input')[i + 1]?.value || ''
-                        });
+                // 가입경로 정보 수집
+                referral_sources: Array.from(document.querySelectorAll('input[name="referral"]:checked')).map(cb => {
+                    // 기본 소스 정보
+                    const sourceInfo = {
+                        source: cb.value
+                    };
+
+                    // SNS인 경우 detail 정보 추가
+                    if (cb.value === 'SNS') {
+                        const snsDetail = document.getElementById('snsField')?.value || '';
+                        if (snsDetail) {
+                            sourceInfo.detail = snsDetail;
+                        }
                     }
-                    return acc;
-                }, []),
-                cash_receipt: document.querySelector('input[name="cash_receipt"]:checked')?.value || '',
-                receipt_phone: document.getElementById('receipt_phone').value,
-                membership_start_date: document.getElementById('membership_start_date').value,
-                referral_sources: Array.from(document.querySelectorAll('input[name="referral"]:checked')).map(cb => ({
-                    source: cb.value,
-                    detail: cb.value === 'SNS' ? document.getElementById('snsField').value :
-                        cb.value === '인터넷검색' ? document.querySelector('input[name="internet_detail"]').value :
-                            cb.value === '지인추천' ? document.querySelector('input[name="referral_name"]').value : ''
-                })),
-                terms_agreed: {
-                    main: document.querySelector('input[name="terms_agree"]').checked,
-                    twentyfour_hour: document.querySelector('input[name="24h_terms_agree"]').checked,
-                    refund: document.querySelector('input[name="refund_terms_agree"]').checked
-                },
+
+                    return sourceInfo;
+                }),
                 timestamp: new Date().toISOString(),
-                unpaid: document.getElementById('unpaid').value,
                 adminVerified: isAdmin ? true : false
             };
 
-            /* 폴더 구조에 맞게 Firestore에 회원 정보 저장 */
-            const branchElement = document.getElementById('branch');
-            const branchStr = branchElement ? branchElement.value || '' : '';
-            const yearStr = new Date().getFullYear().toString();
-            console.log(`저장 경로: ${branchStr}/${yearStr}/Membership/${window.docId}`);
+            // 새로운 폴더 구조에 맞게 문서 저장
+            await setDoc(doc(dbInstance, selectedBranch, year, "Onetimepass", window.docIdone), userData);
+            console.log(`✅ Firestore ${selectedBranch}/${year}/Onetimepass에 일일권 정보 저장 완료`);
 
-            // 모든 매개변수가 문자열인지 확인
-            if (typeof branchStr === 'string' && branchStr !== '' && typeof yearStr === 'string' && typeof window.docId === 'string') {
-                await setDoc(doc(dbInstance, branchStr, yearStr, "Membership", window.docId), userData);
-                console.log("문서 저장 성공");
-
-                // 영수증 팝업을 위한 데이터를 window 객체에 저장
-                console.log("영수증 저장 준비: docId =", window.docId);
-
-                resolve();
-
-                // 저장 완료 후 script.js의 downloadAsImage 함수 호출
-                if (typeof window.downloadAsImage === 'function') {
-                    setTimeout(() => {
-                        console.log("영수증 팝업 표시 시작");
-                        window.downloadAsImage();
-                    }, 500);
-                } else {
-                    console.error("downloadAsImage 함수를 찾을 수 없습니다.");
-                }
-            } else {
-                throw new Error(`유효하지 않은 문서 경로: ${branchStr}/${yearStr}/Membership/${window.docId}`);
-            }
+            // Continue with regular membership registration...
+            resolve();
         } catch (error) {
-            console.error("회원 정보 저장 중 오류 발생:", error);
-            alert("회원 정보 저장에 실패했습니다.");
+            console.error("일일권 정보 저장 중 오류 발생:", error);
+            alert("일일권 정보 저장에 실패했습니다.");
             reject(error);
         }
     });
 }
 
 /* 이미지 업로드 함수 - 서명이나 계약서 이미지를 Firebase Storage에 업로드하고 URL을 Firestore에 저장 */
-async function uploadImage(fileName, blob) {
+async function uploadImage(fileName, blob, noteText = "") { // Added noteText parameter
     try {
         const { ref, uploadBytes, getDownloadURL } = await import("https://www.gstatic.com/firebasejs/11.3.0/firebase-storage.js");
         const { doc, updateDoc } = await import("https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js");
@@ -366,37 +276,42 @@ async function uploadImage(fileName, blob) {
         const storage = firebaseInstance.storage;
         const db = firebaseInstance.db;
 
-        // 폴더 구조에 맞게 Membership 컬렉션 경로 설정
-        const collectionName = "Membership";
-        const branch = document.getElementById('branch').value;
+        // 현재 페이지 URL에 따라 컬렉션 이름 결정
+        const isOnetime = window.location.pathname.includes('onetime.html') || window.location.pathname.includes('onetime-receipt.html');
+        const collectionName = isOnetime ? "Onetimepass" : "Membership";
+
+        // 지점 정보 가져오기
+        const selectedBranch = document.getElementById('branch').value;
         const year = new Date().getFullYear().toString();
 
-        // 페이지 기반으로 폴더 구분 (receipt.html인 경우 Receipt, 그 외에는 Contract)
-        const isReceiptPage = window.location.pathname.includes('receipt.html');
+        // 페이지 기반으로 폴더 구분 (receipt.html 또는 onetime-receipt.html인 경우 Receipt, 그 외에는 Contract)
+        const isReceiptPage = window.location.pathname.includes('receipt.html') || window.location.pathname.includes('onetime-receipt.html');
         const fileType = isReceiptPage ? 'Receipt' : 'Contract';
 
-        // 파일명에 docId를 사용하여 ID와 동일하게 맞춤
-        const storageFileName = isReceiptPage ? fileName : window.docId;
+        // 파일명 생성 함수 사용
+        const storageFileName = isReceiptPage ? generateReceiptFileName(window.docIdone, 1, noteText) : window.docIdone;
+
+        console.log(`저장 경로: ${selectedBranch}/${year}/${collectionName}/${fileType}/${storageFileName}`);
 
         /* Firebase Storage에 이미지 업로드 - 새 폴더 구조 적용 */
         // selectedBranch는 이미 지점명 (관저점, 용문가장점)
-        const storageRef = ref(storage, `${branch}/${year}/${collectionName}/${fileType}/${storageFileName}`);
+        const storageRef = ref(storage, `${selectedBranch}/${year}/${collectionName}/${fileType}/${storageFileName}`);
         // Content-Disposition: attachment 메타데이터 추가
         const metadata = {
           contentDisposition: 'attachment'
         };
         await uploadBytes(storageRef, blob, metadata);
-        console.log("✅ Firebase Storage 업로드 완료!");
+        console.log(`✅ Firebase Storage 업로드 완료! 경로: ${selectedBranch}/${year}/${collectionName}/${fileType}`);
 
         /* 업로드된 이미지의 다운로드 URL 가져오기 */
         const downloadURL = await getDownloadURL(storageRef);
         console.log("🔗 Firebase Storage 이미지 URL:", downloadURL);
 
         /* Firestore 문서에 이미지 URL 업데이트 */
-        if (window.docId) {
-            const docRef = doc(db, branch, year, collectionName, window.docId);
+        if (window.docIdone) {
+            const docRef = doc(db, selectedBranch, year, collectionName, window.docIdone); 
             await updateDoc(docRef, { imageUrl: downloadURL });
-            console.log(`✅ Firestore ${branch}/${year}/${collectionName}에 이미지 URL 저장 완료:`, downloadURL);
+            console.log(`✅ Firestore ${selectedBranch}/${year}/${collectionName}에 이미지 URL 저장 완료:`, downloadURL); 
         } else {
             console.error("❌ Firestore 문서 ID(window.docId)가 제공되지 않음.");
         }
@@ -408,6 +323,5 @@ async function uploadImage(fileName, blob) {
     }
 }
 
-
-window.submitForm = submitForm;
+window.submitOnetimeForm = submitOnetimeForm;
 window.uploadImage = uploadImage;
