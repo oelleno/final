@@ -300,7 +300,7 @@ async function uploadImage(fileName, blob, noteText = "") { // Added noteText pa
         const storageRef = ref(storage, `${selectedBranch}/${year}/${collectionName}/${fileType}/${storageFileName}`);
         // Content-Disposition: attachment 메타데이터 추가
         const metadata = {
-          contentDisposition: 'attachment'
+          contentDisposition: 'inline'
         };
         await uploadBytes(storageRef, blob, metadata);
         console.log(`✅ Firebase Storage 업로드 완료! 경로: ${selectedBranch}/${year}/${collectionName}/${fileType}`);
