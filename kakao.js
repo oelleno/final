@@ -54,8 +54,8 @@ async function getKakaoSettings() {
       throw new Error("카카오 설정 문서를 찾을 수 없습니다.");
     }
 
-    // DB 필드명 그대로 사용
-    return kakaoDocSnap.data();
+    const settings = kakaoDocSnap.data();
+    return settings;
   } catch (error) {
     console.error("카카오 설정 가져오기 오류:", error);
     return null;
@@ -240,7 +240,7 @@ async function sendKakaoMember() {
     const customerName = userData.name;
     const customerPhone = userData.contact;
     const contractUrl = userData.imageUrl.replace('https://', '');
-
+    const companyWithStar = `${kakaoConfig.COMPANY_NAME}★`;
     if (!customerPhone) {
       throw new Error('회원 전화번호를 찾을 수 없습니다.');
     }
@@ -252,7 +252,7 @@ async function sendKakaoMember() {
             'tpl_code': 'TY_6051',
             'receiver_1': customerPhone,
             'subject_1': '계약서',
-            'message_1': `안녕하세요. ${customerName}님\n${kakaoConfig.COMPANY_NAME}에 등록해주셔서 감사드립니다!`,
+            'message_1': `안녕하세요. ${customerName}님\n${companyWithStar}에 등록해주셔서 감사드립니다!`,
             'button_1': JSON.stringify({
               "button": [
                 { "name": "채널추가", "linkType": "AC", "linkTypeName": "채널 추가" },

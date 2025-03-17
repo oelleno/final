@@ -24,17 +24,8 @@ async function initializeFirebase() {
       firebaseConfig = await response.json();
       console.log("Firebase 설정 가져오기 성공 (일회권 카카오)");
     } catch (error) {
-      console.warn("클라우드 함수에서 Firebase 설정 가져오기 실패, 폴백 설정 사용 (일회권 카카오):", error);
-
-      // 폴백 Firebase 설정
-      firebaseConfig = {
-        apiKey: "AIzaSyAyP5QTMzBtz8lMEzkE4C66CjFbZ3a17QM",
-        authDomain: "bodystar-1b77d.firebaseapp.com",
-        projectId: "bodystar-1b77d",
-        storageBucket: "bodystar-1b77d.appspot.com",
-        messagingSenderId: "1069668103083",
-        appId: "1:1069668103083:web:a3f71da3d1ecc46d68aaa7"
-      };
+      console.error("Firebase 설정을 가져오는데 실패했습니다:", error);
+      throw error;
     }
 
     const app = initializeApp(firebaseConfig, "kakao-onetime-app");
@@ -63,7 +54,8 @@ async function getKakaoSettings() {
       throw new Error("카카오 설정 문서를 찾을 수 없습니다.");
     }
 
-    return kakaoDocSnap.data();
+    const settings = kakaoDocSnap.data();
+    return settings;
   } catch (error) {
     console.error("카카오 설정 가져오기 오류:", error);
     return null;
@@ -166,10 +158,6 @@ async function getContractData() {
     console.log("일회권 사용자 데이터 조회 성공:", userData.name);
 
     // 필수 정보 확인
-    if (!userData.imageUrl) {
-      throw new Error('계약서 이미지가 아직 업로드되지 않았습니다. 잠시 후 다시 시도해주세요.');
-    }
-
     if (!userData.contact) {
       throw new Error('연락처 정보가 없습니다.');
     }
@@ -203,30 +191,18 @@ async function sendKakaoneMember() {
     const userData = await getContractData();
     const customerName = userData.name;
     const customerPhone = userData.contact;
-    const contractUrl = userData.imageUrl ? userData.imageUrl.replace('https://', '') : '';
-
-    if (!customerPhone) {
-      throw new Error('회원 전화번호를 찾을 수 없습니다.');
-    }
-
+    const companyWithStar = `${kakaoConfig.COMPANY_NAME}★${userData.branch}`;
     console.log(`회원 알림톡 전송 중: ${customerName}님 (${customerPhone})`);
 
     // 회원용 알림톡 파라미터 설정
     const params = new URLSearchParams({
-      'tpl_code': 'TY_1680',
+      'tpl_code': 'TY_7127',
       'receiver_1': customerPhone,
       'subject_1': '계약서',
-      'message_1': `[${kakaoConfig.COMPANY_NAME}]\n안녕하세요. ${customerName}님!\n${kakaoConfig.COMPANY_NAME}에 등록해주셔서 진심으로 감사드립니다!`,
+      'message_1': `안녕하세요. ${customerName}님\n${companyWithStar}에 방문해 주셔서 감사드립니다!\n▶${new Date().toLocaleString('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }).replace(/(\d+)\. (\d+)\. (\d+)\./, '$1.$2.$3.')}\n▶이용시간은 최대 4시간입니다.\n\n다음엔 더 오래 함께하길 기대하겠습니다.\n다시 뵙길 바래요!`,
       'button_1': JSON.stringify({
         "button": [
-          { "name": "채널추가", "linkType": "AC", "linkTypeName": "채널 추가" },
-          {
-            "name": "계약서 바로가기",
-            "linkType": "WL",
-            "linkTypeName": "웹링크",
-            "linkPc": `https://${contractUrl}`,
-            "linkMo": `https://${contractUrl}`
-          }
+          { "name": "채널추가", "linkType": "AC", "linkTypeName": "채널 추가" }
         ]
       }),
       'failover': 'N'

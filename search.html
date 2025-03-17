@@ -480,17 +480,19 @@
                                                 const adminCode = document.getElementById('admin-code').value.trim();
 
                                                 // 생년월일 검증 로직
-                                                // 1. 관리자 코드가 있으면 생년월일 검증 없이 통과
+                                                let birthdateMatches = false;
+                                                if (cleanInputBirthdate && cleanDBBirthdate) {
+                                                    birthdateMatches = cleanDBBirthdate === cleanInputBirthdate || 
+                                                                     formattedDBBirthdate === cleanInputBirthdate;
+                                                }
+
                                                 // 관리자 코드가 있거나 생년월일이 일치하는 경우에만 결과에 포함
-                                                if (adminCode || 
-                                                    (cleanInputBirthdate && cleanDBBirthdate && (
-                                                        cleanDBBirthdate === cleanInputBirthdate || 
-                                                        formattedDBBirthdate === cleanInputBirthdate
-                                                    ))) {
+                                                if (adminCode || (cleanInputBirthdate && birthdateMatches)) {
                                                     console.log(`✅ 일치: ${data.name} (${data.birthdate})`);
                                                     filteredResults.push({doc, data});
-                                                } else {
+                                                } else if (cleanInputBirthdate && !birthdateMatches) {
                                                     console.log(`❌ 불일치: ${data.name} - 생년월일이 다릅니다`);
+                                                    return; // Skip this result
                                                 }
                                             });
                                         }
@@ -534,23 +536,19 @@
                                             const adminCode = document.getElementById('admin-code').value.trim();
 
                                             // 생년월일 검증 로직
-                                            // 1. 관리자 코드가 있으면 생년월일 검증 없이 통과
-                                            // 2. 정확히 일치하는 경우
-                                            // 3. 형식을 통일했을 때 일치하는 경우
-                                            if (adminCode) {
-                                                console.log(`✅ 관리자 코드 입력됨 -> 이름만 매칭됨`);
+                                            let birthdateMatches = false;
+                                            if (cleanInputBirthdate && cleanDBBirthdate) {
+                                                birthdateMatches = cleanDBBirthdate === cleanInputBirthdate || 
+                                                                 formattedDBBirthdate === cleanInputBirthdate;
+                                            }
+
+                                            // 관리자 코드가 있거나 생년월일이 일치하는 경우에만 결과에 포함
+                                            if (adminCode || (cleanInputBirthdate && birthdateMatches)) {
+                                                console.log(`✅ 일치: ${data.name} (${data.birthdate})`);
                                                 filteredResults.push({doc, data});
-                                            } else {
-                                                if (!cleanInputBirthdate) {
-                                                    console.log(`❌ 생년월일 미입력 -> 결과에서 제외`);
-                                                } else if (!cleanDBBirthdate) {
-                                                    console.log(`❌ 데이터베이스에 생년월일 없음 -> 결과에서 제외`);
-                                                } else if (cleanDBBirthdate === cleanInputBirthdate || formattedDBBirthdate === cleanInputBirthdate) { 
-                                                    console.log(`✅ 이름 + 생년월일 매칭됨: ${data.name} (${data.birthdate})`);
-                                                    filteredResults.push({doc, data});
-                                                } else {
-                                                    console.log(`❌ 생년월일 불일치 -> 결과에서 제외`);
-                                                }
+                                            } else if (cleanInputBirthdate && !birthdateMatches) {
+                                                console.log(`❌ 불일치: ${data.name} - 생년월일이 다릅니다`);
+                                                return; // Skip this result
                                             }
 
                                         });
