@@ -234,7 +234,17 @@
 
         async function initializeFirebase() {
             try {
-                const response = await fetch("https://us-central1-bodystar-1b77d.cloudfunctions.net/getFirebaseConfig");
+                const response = await fetch("https://us-central1-bodystar-1b77d.cloudfunctions.net/getFirebaseConfig", {
+                    method: 'GET',
+                    mode: 'cors',
+                    cache: 'no-cache',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP 오류: ${response.status}`);
+                }
+
                 const firebaseConfig = await response.json();
                 console.log("Firebase 설정 가져오기 성공");
 
@@ -248,7 +258,7 @@
 
                 return true;
             } catch (error) {
-                console.error("Firebase 설정 가져오기 오류:", error);
+                console.error("Firebase 초기화 오류:", error);
                 if (document.getElementById("status")) {
                     document.getElementById("status").innerText = "Firebase 연결 오류가 발생했습니다.";
                 }
@@ -486,13 +496,18 @@
                                                                      formattedDBBirthdate === cleanInputBirthdate;
                                                 }
 
-                                                // 관리자 코드가 있거나 생년월일이 일치하는 경우에만 결과에 포함
-                                                if (adminCode || (cleanInputBirthdate && birthdateMatches)) {
-                                                    console.log(`✅ 일치: ${data.name} (${data.birthdate})`);
+                                                // 생년월일이 입력된 경우 정확히 일치하는 경우만 포함
+                                                if (cleanInputBirthdate) {
+                                                    if (birthdateMatches) {
+                                                        console.log(`✅ 일치: ${data.name} (${data.birthdate})`);
+                                                        filteredResults.push({doc, data});
+                                                    } else {
+                                                        console.log(`❌ 불일치: ${data.name} - 생년월일이 다릅니다`);
+                                                    }
+                                                } else if (adminCode) {
+                                                    // 관리자 코드가 있는 경우만 모든 결과 표시
+                                                    console.log(`✅ 관리자 코드로 조회: ${data.name}`);
                                                     filteredResults.push({doc, data});
-                                                } else if (cleanInputBirthdate && !birthdateMatches) {
-                                                    console.log(`❌ 불일치: ${data.name} - 생년월일이 다릅니다`);
-                                                    return; // Skip this result
                                                 }
                                             });
                                         }
@@ -542,13 +557,16 @@
                                                                  formattedDBBirthdate === cleanInputBirthdate;
                                             }
 
-                                            // 관리자 코드가 있거나 생년월일이 일치하는 경우에만 결과에 포함
-                                            if (adminCode || (cleanInputBirthdate && birthdateMatches)) {
-                                                console.log(`✅ 일치: ${data.name} (${data.birthdate})`);
+                                            // 생년월일이 입력된 경우 정확히 일치하는 경우만 포함
+                                            if (cleanInputBirthdate) {
+                                                if (birthdateMatches) {
+                                                    console.log(`✅ 일치: ${data.name} (${data.birthdate})`);
+                                                    filteredResults.push({doc, data});
+                                                }
+                                            } else if (adminCode) {
+                                                // 관리자 코드가 있는 경우만 모든 결과 표시
+                                                console.log(`✅ 관리자 코드로 조회: ${data.name}`);
                                                 filteredResults.push({doc, data});
-                                            } else if (cleanInputBirthdate && !birthdateMatches) {
-                                                console.log(`❌ 불일치: ${data.name} - 생년월일이 다릅니다`);
-                                                return; // Skip this result
                                             }
 
                                         });
@@ -757,7 +775,7 @@
                                                     showNotification('영수증이 없습니다.', 'error');
                                                 }
                                             } else {
-                                                showNotification('문서를 찾을 수 없습니다.', 'error');
+                                                showNotification('문서를 찾을수 없습니다.', 'error');
                                             }
                                         } catch (error) {
                                             console.error('영수증 로딩 중 오류:', error);
