@@ -239,8 +239,8 @@ async function sendKakaoMember() {
     const userData = await getContractData();
     const customerName = userData.name;
     const customerPhone = userData.contact;
-    const contractUrl = userData.imageUrl.replace('https://', '');
-    const companyWithStar = `${kakaoConfig.COMPANY_NAME}★`;
+    const searchUrl = 'oelleno.github.io/search/'
+    const companyWithStar = `${kakaoConfig.COMPANY_NAME}★${userData.branch}`;
     if (!customerPhone) {
       throw new Error('회원 전화번호를 찾을 수 없습니다.');
     }
@@ -260,8 +260,8 @@ async function sendKakaoMember() {
                   "name": "계약서 바로가기",
                   "linkType": "WL",
                   "linkTypeName": "웹링크",
-                  "linkPc": `https://${contractUrl}`,
-                  "linkMo": `https://${contractUrl}`
+                  "linkPc": `https://${searchUrl}`,
+                  "linkMo": `https://${searchUrl}`
           }
         ]
       }),
@@ -411,5 +411,10 @@ async function sendKakaoneMember() {
   }
 }
 
-// 일회권 알림톡 전송 함수 내보내기
-export { sendKakaoneMember };
+// 함수들을 객체로 내보내기
+window.kakaoAPI = {
+  sendVerificationCode,
+  sendKakaoMember, 
+  sendKakaoManager,
+  sendKakaoneMember
+};

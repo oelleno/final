@@ -282,7 +282,8 @@
     let currentReceiptBox = null;
     let stream = null;
     import {doc, updateDoc, arrayUnion, getDoc} from "https://www.gstatic.com/firebasejs/11.3.0/firebase-firestore.js";
-    import {ref, uploadString, getDownloadURL, uploadBytesResumable} from "https://www.gstatic.com/firebasejs/11.3.0/firebase-storage.js";
+    import { ref, uploadBytes, uploadBytesResumable, getDownloadURL, uploadString } from "https://www.gstatic.com/firebasejs/11.3.0/firebase-storage.js";
+
 
     // Firebase 초기화 함수 - 전역으로 사용할 수 있도록 window 객체에 할당
     window.initializeFirebase = async function() {
@@ -594,6 +595,10 @@
       console.log(`업로드 경로: ${storagePath} (지점명/연도/Membership/Receipt)`);
 
       const storageRef = ref(window.storageInstance, storagePath);
+      const metadata = {
+          contentDisposition: 'inline',
+          contentType: 'image/jpeg'
+      };
 
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
@@ -612,7 +617,7 @@
       const imageData = canvas.toDataURL('image/jpeg').split(',')[1];
 
       try {
-        await uploadString(storageRef, imageData, 'base64');
+        await uploadString(storageRef, imageData, 'base64', metadata);
         const downloadURL = await getDownloadURL(storageRef);
 
         // Get the Firestore instance
@@ -729,10 +734,18 @@
         // docId에서 브랜치 코드 추출
         const branchCode = window.docId ? window.docId.substring(0, 2) : 'GJ';
         const currentYear = new Date().getFullYear().toString();
+        
+        // branchCode를 기반으로 올바른 지점명 매핑
+        let branchStr = '';
+        if (branchCode === 'GJ') {
+            branchStr = '관저점';
+        } else if (branchCode === 'YM') {
+            branchStr = '용문가장점';
+        }
 
-        // Firestore에서 특정 문서 가져오기 (경로 형식: 브랜치코드/연도/Membership/docId)
-        console.log(`문서 경로: ${branchCode}/${currentYear}/Membership/${window.docId}`);
-        const docRef = doc(dbInstance, branchCode, currentYear, "Membership", window.docId);
+        // Firestore에서 특정 문서 가져오기 (경로 형식: 지점명/연도/Membership/docId)
+        console.log(`문서 경로: ${branchStr}/${currentYear}/Membership/${window.docId}`);
+        const docRef = doc(dbInstance, branchStr, currentYear, "Membership", window.docId);
         const docSnap = await getDoc(docRef);
 
         // 계약 담당자 이름 가져오기

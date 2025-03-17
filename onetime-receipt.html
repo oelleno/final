@@ -869,9 +869,17 @@
         const branchCode = window.docIdone ? window.docIdone.substring(0, 2) : 'GJ';
         const currentYear = new Date().getFullYear().toString();
 
-        // Firestore에서 특정 문서 가져오기 (경로 형식: 브랜치코드/연도/Onetimepass/docIdone)
-        console.log(`문서 경로: ${branchCode}/${currentYear}/Onetimepass/${window.docIdone}`);
-        const docRef = doc(dbInstance, branchCode, currentYear, "Onetimepass", window.docIdone);
+        // branchCode를 기반으로 올바른 지점명 매핑
+        let branchStr = '';
+        if (branchCode === 'GJ') {
+            branchStr = '관저점';
+        } else if (branchCode === 'YM') {
+            branchStr = '용문가장점';
+        }
+
+        // Firestore에서 특정 문서 가져오기 (경로 형식: 지점명/연도/Onetimepass/docIdone)
+        console.log(`문서 경로: ${branchStr}/${currentYear}/Onetimepass/${window.docIdone}`);
+        const docRef = doc(dbInstance, branchStr, currentYear, "Onetimepass", window.docIdone);
         const docSnap = await getDoc(docRef);
 
         // 계약 담당자 이름 가져오기

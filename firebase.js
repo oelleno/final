@@ -53,17 +53,8 @@ async function getFirebaseConfig() {
         }
         return config;
     } catch (error) {
-        console.warn("클라우드 함수에서 Firebase 설정 가져오기 실패, 폴백 설정 사용:", error);
-
-        // 폴백 Firebase 설정 (웹뷰 로그에서 확인된 설정 사용)
-        return {
-            apiKey: "AIzaSyAyP5QTMzBtz8lMEzkE4C66CjFbZ3a17QM",
-            authDomain: "bodystar-1b77d.firebaseapp.com",
-            projectId: "bodystar-1b77d",
-            storageBucket: "bodystar-1b77d.appspot.com",
-            messagingSenderId: "1069668103083",
-            appId: "1:1069668103083:web:a3f71da3d1ecc46d68aaa7"
-        };
+        console.error("Firebase 설정을 가져오는데 실패했습니다:", error);
+        throw error;
     }
 }
 
